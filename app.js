@@ -14,9 +14,9 @@ const app = express();
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
+app.use(express.urlencoded({ extended: false }));
 app.use(session({ secret: "secret", resave: false, saveUninitialized: false }));
 app.use(passport.session());
-app.use(express.urlencoded({ extended: false }));
 
 passport.use(
   new LocalStrategy(async (username, password, done) => {
@@ -33,6 +33,7 @@ passport.use(
       if (user.password !== password) {
         return done(null, false, { message: "Incorrect password" });
       }
+      return done(null, user);
     } catch (error) {
       return done(error);
     }
@@ -55,10 +56,9 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
-app.get("/", (req, res) => res.render("index"));
+app.get("/", (req, res) => res.render("index", { user: req.user }));
 
 app.get("/sign-up", (req, res) => res.render("sign-up-form"));
-
 app.post("/sign-up", async (req, res, next) => {
   try {
     await pool.query("INSERT INTO USERS (username, password) VALUES ($1, $2)", [
@@ -69,6 +69,25 @@ app.post("/sign-up", async (req, res, next) => {
   } catch (error) {
     return next(error);
   }
+});
+
+app.get("/log-in", (req, res) => res.render("log-in-form"));
+app.post(
+  "/log-in",
+  passport.authenticate("local", {
+    successRedirect: "/",
+    failureRedirect: "/",
+    failureMessage: true,
+  }),
+);
+
+app.get("/log-out", (req, res, next) => {
+  req.logout((err) => {
+    if (err) {
+      return next(err);
+    }
+    res.redirect("/");
+  });
 });
 
 app.listen(3000, (error) => {
